@@ -127,19 +127,7 @@ lending_testing <- testing(lending_split)
 lending_recipe <- recipe(Class~., 
                          data = lending_training) %>% 
                          step_rm(sub_grade, acc_now_delinq, delinq_amnt)%>%
-                         step_mutate_at(funded_amnt,
-                                        annual_inc,
-                                        delinq_2yrs, 
-                                        inq_last_6mths,
-                                        open_il_6m, 
-                                        open_il_12m,
-                                        open_il_24m,
-                                        total_bal_il, 
-                                        all_util, 
-                                        inq_fi,
-                                        inq_last_12m,
-                                        num_il_tl,
-                                        total_il_high_credit_limit,
+                         step_mutate_at(all_numeric(),
                                         fn = ~ as.numeric(.)) %>%
                           step_dummy(all_nominal(), 
                                    -all_outcomes()) %>%
