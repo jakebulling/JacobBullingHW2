@@ -125,7 +125,7 @@ lending_testing <- testing(lending_split)
 ```{r}
 
 lending_recipe <- recipe(Class~., 
-                         data = lending_training, 
+                         data = lending_training) %>% 
                          step_mutate_at(funded_amnt,
                                         annual_inc,
                                         delinq_2yrs, 
@@ -140,7 +140,7 @@ lending_recipe <- recipe(Class~.,
                                         delinq_amnt, 
                                         num_il_tl,
                                         total_il_high_credit_limit,
-                                        fn = ~ as.numeric()) %>%
+                                        fn = ~ as.numeric(.)) %>%
                            step_mutate(sub_grade = as.character(sub_grade),
                                        sub_grade = fct_relevel(
                                                   case_when(
@@ -154,11 +154,10 @@ lending_recipe <- recipe(Class~.,
                                                   TRUE ~ sub_grade
                         ),
                         "A", "B", "C", "D", "E", "F", "G")) %>%
-                        step_dummy(all_predictors(), 
+                        step_dummy(all_nominal(), 
                                    -all_outcomes()) %>%
                           step_normalize(all_predictors(), 
-                                         -all_nominal()))
-
+                                         -all_nominal())
 
 
 lending_recipe %>%
