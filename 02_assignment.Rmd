@@ -168,6 +168,7 @@ lending_recipe %>%
 hello
 5. Set up the lasso model and workflow. We will tune the `penalty` parameter.
 
+
 6. Set up the model tuning for the `penalty` parameter. Be sure to add the `control_stack_grid()` for the `control` argument so we can use these results later when we stack. Find the accuracy and area under the roc curve for the model with the best tuning parameter.  Use 5-fold cv.
 
 ```{r}
