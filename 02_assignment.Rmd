@@ -126,6 +126,7 @@ lending_testing <- testing(lending_split)
 
 lending_recipe <- recipe(Class~., 
                          data = lending_training) %>% 
+                         step_rm(sub_grade, acc_now_delinq, delinq_amnt)%>%
                          step_mutate_at(funded_amnt,
                                         annual_inc,
                                         delinq_2yrs, 
@@ -137,24 +138,10 @@ lending_recipe <- recipe(Class~.,
                                         all_util, 
                                         inq_fi,
                                         inq_last_12m,
-                                        delinq_amnt, 
                                         num_il_tl,
                                         total_il_high_credit_limit,
                                         fn = ~ as.numeric(.)) %>%
-                           step_mutate(sub_grade = as.character(sub_grade),
-                                       sub_grade = fct_relevel(
-                                                  case_when(
-                                                  sub_grade %in% c("A1", "A2", "A3", "A4", "A5")~ "A",
-                                                  sub_grade %in% c("B1", "B2", "B3", "B4") ~ "B",
-                                                  sub_grade %in% c("C1", "C2", "C3", "C4", "C5") ~"C", 
-                                                  sub_grade %in% c("D1","D2", "D3", "D4", "D5") ~"D", 
-                                                  sub_grade %in% c("E1","E2", "E3", "E4","E5") ~ "E", 
-                                                  sub_grade %in% c("F1","F2", "F3", "F4","F5") ~"F", 
-                                                  sub_grade %in% c("G1", "G2", "G3", "G4", "G5") ~ "G", 
-                                                  TRUE ~ sub_grade
-                        ),
-                        "A", "B", "C", "D", "E", "F", "G")) %>%
-                        step_dummy(all_nominal(), 
+                          step_dummy(all_nominal(), 
                                    -all_outcomes()) %>%
                           step_normalize(all_predictors(), 
                                          -all_nominal())
@@ -169,10 +156,71 @@ hello
 5. Set up the lasso model and workflow. We will tune the `penalty` parameter.
 
 
+```{r}
+#Creating model 
+
+lending_lasso_model <- 
+  logistic_reg(mixture = 1) %>%
+  set_engine("glmnet") %>%
+  set_args(penalty = tune()) %>%
+  set_mode("classification")
+  
+```
+
+
+
+```{r}
+#Workflow setup
+
+lending_wf <- 
+  workflow() %>%
+  add_recipe(lending_recipe) %>% 
+  add_model(lending_lasso_model)
+```
+
+
 6. Set up the model tuning for the `penalty` parameter. Be sure to add the `control_stack_grid()` for the `control` argument so we can use these results later when we stack. Find the accuracy and area under the roc curve for the model with the best tuning parameter.  Use 5-fold cv.
 
 ```{r}
+#Setting up tuning and penalty grid. 
+
 set.seed(494) #for reproducible 5-fold
+
+lending_cv <- vfold_cv(lending_training,v = 5)
+
+penalty_grid <- grid_regular(penalty(),
+                             levels = 10)
+metric <- metric_set(accuracy)
+ctrl_res <- control_stack_resamples()
+
+lending_lasso_tune <- lending_wf %>%
+  tune_grid(resamples = lending_cv, 
+            metrics = metric, 
+            grid = penalty_grid, 
+            control = ctrl_res)
+
+```
+
+
+
+```{r}
+?plot.model_performance
+
+best_param <- lending_lasso_tune %>%
+  select_best(metric = "accuracy")
+best_param
+
+
+# finalize workflow
+lending_lasso_final_wf <- lending_wf %>% 
+  finalize_workflow(best_param)
+
+# fit final model
+lending_lasso_final_mod <- lending_lasso_final_wf %>% 
+  fit(data = lending_training)
+
+
+
 ```
 
 
