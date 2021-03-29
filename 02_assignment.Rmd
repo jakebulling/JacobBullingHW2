@@ -123,7 +123,6 @@ lending_testing <- testing(lending_split)
 
 
 ```{r}
-levels(lending_training$sub_grade)
 
 lending_recipe <- recipe(Class~., 
                          data = lending_training, 
@@ -142,19 +141,29 @@ lending_recipe <- recipe(Class~.,
                                         num_il_tl,
                                         total_il_high_credit_limit,
                                         fn = ~ as.numeric()) %>%
-                           step_mutate(sub_grade = as.character(grade),
+                           step_mutate(sub_grade = as.character(sub_grade),
                                        sub_grade = fct_relevel(
                                                   case_when(
-                                                  sub_grade %in% "A1":"A5"   ~ "A",
-                                                  sub_grade %in% "B1":"B4" ~ "B",
-                                                  sub_grade %in% "C1":"C5" ~"C", 
-                                                  sub_grade %in% "D1":"D5" ~"D", 
-                                                  sub_grade %in% "E1":"E5" ~ "E", 
-                                                  sub_grade %in% "F1":"F5" ~"F", 
-                                                  sub_grade %in% "G1":"G5" ~ "G", 
+                                                  sub_grade %in% c("A1", "A2", "A3", "A4", "A5")~ "A",
+                                                  sub_grade %in% c("B1", "B2", "B3", "B4") ~ "B",
+                                                  sub_grade %in% c("C1", "C2", "C3", "C4", "C5") ~"C", 
+                                                  sub_grade %in% c("D1","D2", "D3", "D4", "D5") ~"D", 
+                                                  sub_grade %in% c("E1","E2", "E3", "E4","E5") ~ "E", 
+                                                  sub_grade %in% c("F1","F2", "F3", "F4","F5") ~"F", 
+                                                  sub_grade %in% c("G1", "G2", "G3", "G4", "G5") ~ "G", 
                                                   TRUE ~ sub_grade
                         ),
-                        "A", "B", "C", "D", "E", "F", "G")))
+                        "A", "B", "C", "D", "E", "F", "G")) %>%
+                        step_dummy(all_predictors(), 
+                                   -all_outcomes()) %>%
+                          step_normalize(all_predictors(), 
+                                         -all_nominal()))
+
+
+
+lending_recipe %>%
+  prep(lending_training) %>%
+  juice()
 ```
 
 hello
