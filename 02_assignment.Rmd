@@ -254,21 +254,133 @@ forest_workflow <-
 
 
 ```{r}
+rf_penalty_grid <- grid_regular(finalize(mtry(), lending_training %>% select(-Class)), min_n(), levels = 3)
 
-forest_cv <- forest_workflow %>% 
-  fit_resamples(lending_cv, 
-                control = ctrl_res)
+
+
+forest_tune <- forest_workflow %>%
+               tune_grid(
+                 resamples = lending_cv,
+                 grid = rf_penalty_grid, 
+                 control = control_stack_grid())
+
 
 ```
 
 
 10. Find the best tuning parameters. What is the are the accuracy and area under the ROC curve for the model with those tuning parameters?
 
+```{r}
+best_param_2 <- forest_tune %>%
+  select_best(metric = "accuracy")
+best_param_2
+
+
+
+forest_tune %>%
+  collect_metrics() %>%
+  filter(.metric == "accuracy") %>%
+  slice_max(mean, n = 1)
+
+forest_tune %>%
+  collect_metrics() %>%
+  filter(.metric == "roc_auc") %>%
+  slice_max(mean, n = 1)
+
+forest_final_wf <- forest_workflow %>%
+  finalize_workflow(best_param_2)
+
+forest_fit <- forest_final_wf %>% 
+  fit(lending_training)
+```
+
+
 11. Use functions from the `DALEX` and `DALEXtra` libraries to create a histogram and boxplot of the residuals from the training data. How do they look? Any interesting behavior?
+
+```{r}
+
+
+lasso_explain <- 
+  explain_tidymodels(
+    model = lending_lasso_final_mod,
+    data = lending_training %>% select(-Class),
+    y = lending_training %>%mutate(Class_numeric = as.numeric(Class == "good"))%>% pull(Class_numeric), 
+    label = "lasso"
+  )
+
+
+
+
+rf_explain <- 
+  explain_tidymodels(
+    model = forest_fit,
+    data = lending_training %>% select(-Class),
+    y = lending_training %>% mutate(Class_numeric = as.numeric(Class == "good")) %>% pull(Class_numeric), 
+    label = "rf"
+  )
+
+
+lasso_mod_perf <- model_performance(lasso_explain)
+rf_mod_perf <-  model_performance(rf_explain)
+
+
+
+
+hist_plot <- 
+  plot(lasso_mod_perf,
+       rf_mod_perf, 
+       geom = "histogram")
+
+box_plot <- 
+  plot(lasso_mod_perf, rf_mod_perf, 
+       geom = "boxplot")
+hist_plot + box_plot
+```
+
 
 12. Use `DALEX` functions to create a variable importance plot from this model. What are the most important variables? 
 
+```{r}
+set.seed(494) #since we are sampling & permuting, we set a seed so we can replicate the results
+lasso_var_imp <- 
+  model_parts(
+    lasso_explain
+    )
+
+plot(lasso_var_imp, show_boxplots = TRUE)
+
+
+set.seed(494)
+forest_var_imp <- 
+  model_parts(rf_explain)
+
+
+?model_parts
+plot(forest_var_imp, show_boxplots = TRUE)
+```
+
+
+Interest rate is clearly the most important variable in the model. 
+
+
+
 13. Write a function called `cp_profile` to make a CP profile. The function will take an explainer, a new observation, and a variable name as its arguments and create a CP profile for a quantitative predictor variable. You will need to use the `predict_profile()` function inside the function you create - put the variable name there so the plotting part is easier. You'll also want to use `aes_string()` rather than `aes()` and quote the variables. Use the `cp_profile()` function to create one CP profile of your choosing. Be sure to choose a variable that is numeric, not integer. There seem to be issues with those that I'm looking into.
+
+```{r}
+cp_profile <-function(explain, obs, name) {
+  predict_profile(explainer = explain, new_observation = obs, variables = c(name))
+
+}
+
+
+income_profile <-cp_profile(rf_explain, obs4, "annual_inc")
+
+income_profile %>%  filter(`_vname_` %in% c("annual_inc")) %>% 
+  ggplot(aes(x = annual_inc,
+             y = `_yhat_`)) +
+  geom_line() 
+
+```
 
 For an extra challenge, write a function that will work for either a quantitative or categorical variable. 
 
@@ -276,6 +388,20 @@ If you need help with function writing check out the [Functions](https://r4ds.ha
 
 
 14. Use `DALEX` functions to create partial dependence plots (with the CP profiles in gray) for the 3-4 most important variables. If the important variables are categorical, you can instead make a CP profile for 3 observations in the dataset and discuss how you could go about constructing a partial dependence plot for a categorical variable (you don't have to code it, but you can if you want an extra challenge). If it ever gives you an error that says, "Error: Can't convert from `VARIABLE` <double> to `VARIABLE` <integer> due to loss of precision", then remove that variable from the list. I seem to have figured out why it's doing that, but I don't know how to fix it yet.
+
+
+```{r}
+rf_pdp <- model_profile(explainer = rf_explain, variables = c("annual_inc", "int_rate"))
+
+plot(rf_pdp, 
+     variables = "annual_inc",
+     geom = "profiles")
+
+plot(rf_pdp, 
+     variables = "int_rate",
+     geom = "profiles")
+```
+
 
 15. Fit one more model type of your choosing that will feed into the stacking model. 
 
