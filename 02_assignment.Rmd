@@ -24,6 +24,7 @@ library(vip)               # for variable importance plots
 library(DALEX)             # for model interpretation  
 library(DALEXtra)          # for extension of DALEX
 library(patchwork)         # for combining plots nicely
+library(caret)
 theme_set(theme_minimal()) # Lisa's favorite theme
 ```
 
@@ -466,8 +467,28 @@ autoplot(lending_blend)
 ```{r}
 lending_final_stack <- lending_blend %>%
   fit_members()
-lending_stack_test <- lending_wf %>%
-  last_fit(object = lending_final_stack)
+
+lending_final_fit <- lending_testing %>%
+  bind_cols(predict(lending_final_stack, new_data = lending_testing)) %>%
+  bind_cols(predict(lending_final_stack, new_data = lending_testing, type = "prob"))
+
+lending_final_fit %>%
+  conf_mat(truth = Class, estimate = .pred_class)
+
+lending_final_stack$metrics %>%
+  filter(.metric == "accuracy") %>%
+  slice_max(mean)
+
+lending_final_stack$metrics %>%
+  filter(.metric == "roc_auc") %>%
+  slice_max(mean)
+
+lending_final_fit %>%
+  roc_curve(truth = Class, estimate = .pred_bad) %>%
+  autoplot()
+
+
+
 ```
 
 ## Shiny app
